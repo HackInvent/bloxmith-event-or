@@ -1,0 +1,50 @@
+{
+  "kind": "event_or",
+  "title": "Event OR",
+  "ports": {
+    "inputs": [
+      {
+        "id": 1,
+        "name": "input_1",
+        "title": "In 1",
+        "accepts": [
+          "message/*"
+        ],
+        "multiplicity": "many",
+        "required": false,
+        "execution_requirement": "not_required_for_execution"
+      },
+      {
+        "id": 2,
+        "name": "input_2",
+        "title": "In 2",
+        "accepts": [
+          "message/*"
+        ],
+        "multiplicity": "many",
+        "required": false,
+        "execution_requirement": "not_required_for_execution"
+      }
+    ],
+    "outputs": [
+      {
+        "id": 1,
+        "name": "out",
+        "title": "Out",
+        "emits": [
+          "message/*"
+        ],
+        "multiplicity": "many"
+      }
+    ]
+  },
+  "config": {},
+  "runtime": {
+    "initial_state": "waiting",
+    "runtime_executable": true,
+    "active_worker": true,
+    "centralized_executor": "generic",
+    "centralized_dependency_mode": "any_event",
+    "active_execution_policy": "on_each_event"
+  }
+}

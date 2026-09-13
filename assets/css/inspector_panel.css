@@ -1,0 +1,8 @@
+.cw-structure-inspector {
+  display: grid;
+  gap: 12px;
+}
+
+.cw-structure-inspector textarea {
+  resize: vertical;
+}
