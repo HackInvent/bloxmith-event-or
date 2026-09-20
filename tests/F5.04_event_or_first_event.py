@@ -120,15 +120,15 @@ def _verify_duplicate_event_is_skipped() -> None:
     expect(duplicate.status == "skipped", "The same event must not be relayed twice.")
     expect(
         duplicate.outputs and duplicate.outputs[0].value == "",
-        "Une activation ne contenant qu'un doublon doit émettre une sortie vide.",
+        "An activation holding only a duplicate must emit an empty output.",
     )
     expect(
         duplicate.metadata.get("relayed_events") == [],
-        "Un doublon ignoré ne doit pas apparaître parmi les événements relayés.",
+        "An ignored duplicate must not appear among the relayed events.",
     )
     expect(
         duplicate.metadata.get("event_or_seen") == first.metadata.get("event_or_seen"),
-        "Ignorer un doublon ne doit pas altérer l'état de déduplication.",
+        "Ignoring a duplicate must not alter the deduplication state.",
     )
 
 
