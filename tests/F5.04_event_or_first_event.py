@@ -139,7 +139,7 @@ def _verify_runtime_mode(runtime_mode: str) -> None:
         document = graph_payload(
             f"F5 Event OR {runtime_mode}",
             [
-                text_node("text-1", "Premier événement", "first event", 80, 120),
+                text_node("text-1", "First event", "first event", 80, 120),
                 event_or_node(),
                 display_node("display-1", "Affichage", 680, 120),
             ],
