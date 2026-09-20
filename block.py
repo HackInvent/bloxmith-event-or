@@ -60,7 +60,7 @@ class EventOrBlock(BlockDefinition):
             template=(
                 template
                 .replace("{{ source }}", escape(f"{len(inputs)} input(s)"))
-                .replace("{{ description }}", escape("Relaie uniquement les nouveaux messages entrants et ignore les doublons déjà relayés pendant le run."))
+                .replace("{{ description }}", escape("Relays only new incoming messages and ignores duplicates already relayed during the run."))
             ),
             node={**node, "type": self.kind, "kind": self.kind},
             payload=payload,

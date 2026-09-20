@@ -7,10 +7,10 @@
 # Created Date: 2024-12-07
 # -----------------------------------------------------------------------------
 
-"""F5.04 - Event OR relaie le premier input reçu.
+"""F5.04 - Event OR relays the first input it receives.
 
-Le test connecte une source texte au premier input de `event_or` et vérifie que
-le message est relayé tel quel, sans comportement de merge.
+The test wires a text source to the first input of `event_or` and checks that
+the message is relayed as is, with no merge behavior.
 """
 
 # Test cases:
@@ -70,10 +70,10 @@ def _verify_event_or_without_event_is_skipped() -> None:
         )
         created = create_run_api(server, document, runtime_mode="centralized")
         run = wait_for_run_terminal(server, str(created.get("run_id") or ""))
-        expect(run.get("status") == "success", "Un Event OR silencieux ne doit pas faire echouer le run.")
+        expect(run.get("status") == "success", "A silent Event OR must not fail the run.")
         expect(
             run.get("node_statuses", {}).get("event-or-1") == "skipped",
-            "Event OR sans nouvel evenement ne doit pas apparaitre comme success.",
+            "Event OR with no new event must not report success.",
         )
 
 
@@ -106,18 +106,18 @@ def _verify_duplicate_event_is_skipped() -> None:
     }
     block = EventOrBlock()
     first = block.execute_runtime(BlockRuntimeContext(**base_context))
-    expect(first.status == "success", "Le premier événement doit être relayé.")
-    expect(first.outputs[0].value == event.value, "Event OR doit préserver la valeur sélectionnée.")
+    expect(first.status == "success", "The first event must be relayed.")
+    expect(first.outputs[0].value == event.value, "Event OR must preserve the selected value.")
     expect(
         first.outputs[0].content_type == "application/json",
-        "Event OR doit préserver le content type sélectionné.",
+        "Event OR must preserve the selected content type.",
     )
-    expect(first.metadata.get("event_or_seen"), "Le premier relais doit persister son fingerprint.")
+    expect(first.metadata.get("event_or_seen"), "The first relay must persist its fingerprint.")
 
     duplicate = block.execute_runtime(
         BlockRuntimeContext(previous_result=first.metadata, **base_context)
     )
-    expect(duplicate.status == "skipped", "Le même événement ne doit pas être relayé deux fois.")
+    expect(duplicate.status == "skipped", "The same event must not be relayed twice.")
     expect(
         duplicate.outputs and duplicate.outputs[0].value == "",
         "Une activation ne contenant qu'un doublon doit émettre une sortie vide.",
@@ -150,20 +150,20 @@ def _verify_runtime_mode(runtime_mode: str) -> None:
         )
         created = create_run_api(server, document, runtime_mode=runtime_mode)
         run = wait_for_run_terminal(server, str(created.get("run_id") or ""), timeout_sec=20)
-        expect(run.get("status") == "success", f"Le run event_or {runtime_mode} doit réussir.")
-        expect(run.get("runtime_mode") == runtime_mode, f"Le run doit rester en {runtime_mode}.")
+        expect(run.get("status") == "success", f"The event_or {runtime_mode} run must succeed.")
+        expect(run.get("runtime_mode") == runtime_mode, f"The run must stay in {runtime_mode}.")
         expect(
             run.get("output_values", {}).get("event-or-1:1", {}).get("value") == "first event",
-            f"Event OR ne relaie pas le premier événement en {runtime_mode}.",
+            f"Event OR does not relay the first event in {runtime_mode}.",
         )
         expect(
             run.get("results", {}).get("event-or-1", {}).get("relayed_events"),
-            f"Event OR ne trace aucun événement relayé en {runtime_mode}.",
+            f"Event OR logs no relayed event in {runtime_mode}.",
         )
         if runtime_mode == "zeromq_active":
             expect(
                 run.get("results", {}).get("event-or-1", {}).get("transport") == "zeromq_active",
-                "Event OR actif ne doit pas utiliser le moteur centralisé.",
+                "An active Event OR must not use the centralized engine.",
             )
 
 
