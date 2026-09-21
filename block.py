@@ -42,11 +42,15 @@ class EventOrBlock(BlockDefinition):
             node_classes=["event-or-node"],
             replacements={
                 "title": node.get("title") or self.default_title(),
-                "preview": f"{input_count} incoming event{'s' if input_count > 1 else ''}",
+                "preview": self.translate(
+                    "block.event_or.preview",
+                    {"count": input_count},
+                    fallback=f"{input_count} incoming event{'s' if input_count > 1 else ''}",
+                ),
                 # The card text is countable: the count travels next to the marker so the
-                # browser picks the plural form of the active language on its own.
+                # browser also follows a language change without asking the server again.
                 "preview_count": input_count,
-                "mode": "any event",
+                "mode": self.translate("block.event_or.mode", fallback="any event"),
             },
         )
 
@@ -63,7 +67,10 @@ class EventOrBlock(BlockDefinition):
             template=(
                 template
                 .replace("{{ source }}", escape(f"{len(inputs)} input(s)"))
-                .replace("{{ description }}", escape("Relays only new incoming messages and ignores duplicates already relayed during the run."))
+                .replace("{{ description }}", escape(self.translate(
+                    "block.event_or.behavior_description",
+                    fallback="Relays only new incoming messages and ignores duplicates already relayed during the run.",
+                )))
             ),
             node={**node, "type": self.kind, "kind": self.kind},
             payload=payload,
