@@ -8,8 +8,8 @@
 
 from __future__ import annotations
 
-from html import escape
 import json
+from html import escape
 from typing import Any
 
 from bloxsmith_app.block_api import (
@@ -42,7 +42,9 @@ class EventOrBlock(BlockDefinition):
             node_classes=["event-or-node"],
             replacements={
                 "title": node.get("title") or self.default_title(),
-                "preview": f"{input_count} evenement{'s' if input_count > 1 else ''} entrant{'s' if input_count > 1 else ''}",
+                "preview": f"{input_count} incoming event{'s' if input_count > 1 else ''}",
+                # The card text is countable, so the browser needs the count to pick a plural form.
+                "preview_params": escape(json.dumps({"count": input_count}), quote=True),
                 "mode": "any event",
             },
         )

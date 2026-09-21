@@ -1,0 +1,10 @@
+{
+  "block.event_or.model.title": "Événement OU",
+  "block.event_or.pill": "Événement OU",
+  "block.event_or.preview.one": "{count} événement entrant",
+  "block.event_or.preview.other": "{count} événements entrants",
+  "block.event_or.mode": "tout événement",
+  "block.event_or.sources_label": "Sources",
+  "block.event_or.behavior_label": "Comportement",
+  "block.event_or.behavior_description": "Ne relaie que les nouveaux messages entrants et ignore les doublons déjà relayés pendant le run."
+}

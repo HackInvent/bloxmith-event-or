@@ -1,0 +1,10 @@
+{
+  "block.event_or.model.title": "Event OR",
+  "block.event_or.pill": "Event OR",
+  "block.event_or.preview.one": "{count} incoming event",
+  "block.event_or.preview.other": "{count} incoming events",
+  "block.event_or.mode": "any event",
+  "block.event_or.sources_label": "Sources",
+  "block.event_or.behavior_label": "Behavior",
+  "block.event_or.behavior_description": "Relays only new incoming messages and ignores duplicates already relayed during the run."
+}
