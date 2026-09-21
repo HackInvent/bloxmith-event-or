@@ -43,8 +43,9 @@ class EventOrBlock(BlockDefinition):
             replacements={
                 "title": node.get("title") or self.default_title(),
                 "preview": f"{input_count} incoming event{'s' if input_count > 1 else ''}",
-                # The card text is countable, so the browser needs the count to pick a plural form.
-                "preview_params": escape(json.dumps({"count": input_count}), quote=True),
+                # The card text is countable: the count travels next to the marker so the
+                # browser picks the plural form of the active language on its own.
+                "preview_count": input_count,
                 "mode": "any event",
             },
         )
