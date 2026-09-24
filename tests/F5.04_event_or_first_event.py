@@ -21,6 +21,7 @@ the message is relayed as is, with no merge behavior.
 
 from pathlib import Path
 from types import SimpleNamespace
+from dataclasses import replace
 
 from ui_smoke_common import (
     create_run_api,
@@ -32,6 +33,7 @@ from ui_smoke_common import (
     text_node,
     wait_for_run_terminal,
 )
+from block_test_packages import install_test_package
 
 from blocs.event_or.block import EventOrBlock
 from bloxsmith_app.block_runtime import BlockInputEvent, BlockRuntimeContext
@@ -86,7 +88,7 @@ def _verify_duplicate_event_is_skipped() -> None:
         input_port_name="input_1",
         source_node_id="source-1",
         source_port_id=1,
-        value='{"event":"same"}',
+        value='  {"event":"same"}\n',
         content_type="application/json",
         sequence=1,
     )
@@ -119,8 +121,8 @@ def _verify_duplicate_event_is_skipped() -> None:
     )
     expect(duplicate.status == "skipped", "The same event must not be relayed twice.")
     expect(
-        duplicate.outputs and duplicate.outputs[0].value == "",
-        "An activation holding only a duplicate must emit an empty output.",
+        duplicate.outputs == [],
+        "An activation holding only a duplicate must not emit an output.",
     )
     expect(
         duplicate.metadata.get("relayed_events") == [],
@@ -130,17 +132,46 @@ def _verify_duplicate_event_is_skipped() -> None:
         duplicate.metadata.get("event_or_seen") == first.metadata.get("event_or_seen"),
         "Ignoring a duplicate must not alter the deduplication state.",
     )
+    next_context = {**base_context, "input_events": (replace(event, sequence=2),)}
+    next_result = block.execute_runtime(BlockRuntimeContext(previous_result=first.metadata, **next_context))
+    expect(next_result.status == "success" and next_result.outputs[0].value == event.value,
+           "A new publication with identical data must not be suppressed.")
+    older = block.execute_runtime(BlockRuntimeContext(previous_result=next_result.metadata, **base_context))
+    expect(older.status == "skipped" and not older.outputs, "An older sequenced publication must not replay.")
+    previous = next_result.metadata
+    for sequence in range(3, 103):
+        current = {**base_context, "input_events": (replace(event, sequence=sequence),)}
+        result = block.execute_runtime(BlockRuntimeContext(previous_result=previous, **current))
+        expect(result.status == "success", "Fresh repeated publications must continue to relay.")
+        previous = result.metadata
+    expect(len(previous["event_or_seen"]) == 1, "One connection must retain one watermark, not event history.")
+    expect(len(next(iter(previous["event_or_seen"].values()))["fingerprint"]) == 64,
+           "Deduplication state must not retain complete payloads.")
+
+    # The runtime supplies delivery order; input port numbers are not a clock.
+    earliest = replace(event, edge_id="second-port", input_port_id=2, value="first arrival")
+    latest = replace(event, sequence=2, value="second arrival")
+    batch = block.execute_runtime(BlockRuntimeContext(**{**base_context, "input_events": (earliest, latest)}))
+    expect(batch.outputs[0].value == earliest.value, "Event OR must select the first fresh event of a batch.")
+    expect(len(batch.metadata["relayed_events"]) == 1, "Only the emitted event may be reported as relayed.")
+
+    silence = block.execute_runtime(BlockRuntimeContext(**{**base_context, "input_events": ()}))
+    expect(silence.status == "skipped" and not silence.outputs, "An empty activation must emit nothing.")
 
 
-def _verify_runtime_mode(runtime_mode: str) -> None:
-    """Run the same Event OR mini-graph through one selected execution engine."""
+def _verify_runtime_mode(runtime_mode: str, *, origin: str | None = None) -> None:
+    """Run the Event OR mini-graph through each engine and supported package host."""
 
     with isolated_server() as server:
+        node = event_or_node()
+        if origin:
+            model = install_test_package(server, "event_or", origin=origin)
+            node["block_version"] = model["version"]
         document = graph_payload(
             f"F5 Event OR {runtime_mode}",
             [
                 text_node("text-1", "First event", "first event", 80, 120),
-                event_or_node(),
+                node,
                 display_node("display-1", "Affichage", 680, 120),
             ],
             [
@@ -171,7 +202,8 @@ def main() -> None:
     _verify_event_or_without_event_is_skipped()
     _verify_duplicate_event_is_skipped()
     for runtime_mode in ("centralized", "zeromq_active"):
-        _verify_runtime_mode(runtime_mode)
+        for origin in (None, "managed", "linked"):
+            _verify_runtime_mode(runtime_mode, origin=origin)
     print("[ok] F5.04_event_or_first_event")
 
 

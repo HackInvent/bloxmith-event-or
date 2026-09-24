@@ -9,6 +9,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+from collections.abc import Mapping
 from html import escape
 from typing import Any
 
@@ -78,25 +80,38 @@ class EventOrBlock(BlockDefinition):
         return {"html": html, "context": {"node_id": str(node.get("id") or ""), "input_count": len(inputs), "full_panel": True}}
 
     def execute_runtime(self, context: BlockRuntimeContext) -> BlockRuntimeResult:
-        """Execute the block through the generic runtime context and return runtime outputs.
+        """Relay the first fresh event in delivery order without changing its payload.
 
         Args:
-            context: Generic runtime context injected by the execution engine.
+            context: Runtime input events plus this node's previous deduplication metadata.
+
+        Source sequences distinguish repeated publications with identical values.
+        Retain only one watermark per incoming route, never the entire history or
+        copied payloads. Empty or duplicate-only activations emit no output.
         """
-        raw_seen = context.previous_result.get("event_or_seen") if isinstance(context.previous_result, dict) else []
-        seen = {str(item) for item in raw_seen if str(item or "").strip()} if isinstance(raw_seen, list) else set()
-        next_seen = set(seen)
+        raw_seen = context.previous_result.get("event_or_seen") if isinstance(context.previous_result, Mapping) else {}
+        seen = dict(raw_seen) if isinstance(raw_seen, Mapping) else {}
         relayed_events: list[dict[str, object]] = []
 
-        for event in sorted(context.input_events, key=lambda item: (item.input_port_id, item.edge_id)):
-            value = str(event.value or "").strip()
-            if not value:
+        for event in context.input_events:
+            value = str(event.value if event.value is not None else "")
+            if not value.strip():
                 continue
             content_type = str(event.content_type or TEXT_PLAIN)
-            fingerprint = self._fingerprint(event.edge_id, event.input_port_id, value, content_type)
-            if fingerprint in next_seen:
+            route = json.dumps([event.edge_id, event.input_port_id, event.source_node_id, event.source_port_id])
+            sequence = int(event.sequence or 0)
+            fingerprint = self._fingerprint(event.edge_id, event.input_port_id, value, content_type,
+                                            sequence=sequence)
+            previous = seen.get(route, {})
+            previous = previous if isinstance(previous, Mapping) else {}
+            previous_sequence = previous.get("sequence", 0)
+            previous_sequence = previous_sequence if isinstance(previous_sequence, int) else 0
+            # Per-source delivery is ordered. A lower/equal sequence is a replay,
+            # while unsequenced callers can only be compared with the last value.
+            if (sequence > 0 and previous_sequence > 0 and sequence <= previous_sequence
+                    or sequence <= 0 and fingerprint == previous.get("fingerprint")):
                 continue
-            next_seen.add(fingerprint)
+            seen[route] = {"sequence": sequence, "fingerprint": fingerprint}
             relayed_events.append(
                 {
                     "input_port_id": event.input_port_id,
@@ -107,6 +122,8 @@ class EventOrBlock(BlockDefinition):
                     "content_type": content_type,
                 }
             )
+            # One activation chooses one event; do not mark unselected values as relayed.
+            break
 
         relayed_value = str(relayed_events[-1]["value"] if relayed_events else "")
         output_content_type = str(relayed_events[-1]["content_type"] if relayed_events else TEXT_PLAIN)
@@ -117,16 +134,16 @@ class EventOrBlock(BlockDefinition):
                 value=relayed_value,
                 content_type=output_content_type,
             )
-            for port in context.output_ports
+            for port in context.output_ports if relayed_events
         ]
         logs = (
             [
-                f"[event_or] {context.node_id}.{event['input_port_id']} relaye "
+                f"[event_or] {context.node_id}.{event['input_port_id']} relayed "
                 f"{event['source_node_id']}.{event['source_port_id']}."
                 for event in relayed_events
             ]
             if relayed_events
-            else [f"[event_or] {context.node_id}: aucun nouvel input a relayer."]
+            else [f"[event_or] {context.node_id}: no new input to relay."]
         )
         return BlockRuntimeResult(
             status="success" if relayed_events else "skipped",
@@ -135,22 +152,24 @@ class EventOrBlock(BlockDefinition):
             last_message=relayed_value,
             content_type=output_content_type,
             worker_received=relayed_value or "-",
-            metadata={"event_or_seen": sorted(next_seen), "relayed_events": relayed_events},
+            metadata={"event_or_seen": seen, "relayed_events": relayed_events},
         )
 
-    def _fingerprint(self, edge_id: str, port_id: int, value: str, content_type: str) -> str:
-        """Provide internal EventOrBlock behavior for `_fingerprint`.
+    def _fingerprint(self, edge_id: str, port_id: int, value: str, content_type: str, *, sequence: int) -> str:
+        """Hash one delivered publication without storing its payload in deduplication state.
 
         Args:
-            edge_id: Identifier used to select a graph, port, output, or runtime object.
-            port_id: Numeric port identifier.
-            value: Value to normalize, render, serialize, or process.
-            content_type: Content type value used by this block helper.
+            edge_id: Incoming route identifier.
+            port_id: Destination input port identifier.
+            value: Unmodified text payload.
+            content_type: MIME-like type carried by the publication.
+            sequence: Source publication sequence; zero when unavailable.
         """
-        return json.dumps(
+        identity = json.dumps(
             {
                 "edge": str(edge_id),
                 "port": int(port_id),
+                "sequence": int(sequence),
                 "content_type": str(content_type or TEXT_PLAIN),
                 "value": str(value or ""),
             },
@@ -158,3 +177,4 @@ class EventOrBlock(BlockDefinition):
             sort_keys=True,
             separators=(",", ":"),
         )
+        return hashlib.sha256(identity.encode("utf-8")).hexdigest()
