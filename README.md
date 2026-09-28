@@ -10,9 +10,6 @@ Verified BloxSmith versions: **1.0.9** (bundled-block tests; see [test evidence]
 
 [![EVENT OR — Relays the first fresh incoming event from any of several inputs.](media/thumbnail.webp)](media/cover.png)
 
-*Concept illustration. [Artwork and generation prompt](media/README.md).*
-
-
 ## Role
 
 `event_or` forwards the first new incoming event among its inputs. It is used to unblock a downstream path when any connected input receives data.
